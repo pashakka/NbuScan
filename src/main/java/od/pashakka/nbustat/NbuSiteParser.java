@@ -1,6 +1,7 @@
 package od.pashakka.nbustat;
 
 import ch.qos.logback.classic.Level;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -11,27 +12,31 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URL;
+import java.net.*;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
 public class NbuSiteParser {
+    private static final Logger logger = LoggerFactory.getLogger(
+            NbuSiteParser.class);
     private final String downloadUrl;
     private final String workPath;
     private final String mainUrl;
-    private static final Logger logger = LoggerFactory.getLogger(
-            NbuSiteParser.class);
-    private final String logLevel;
+    private final String proxy;
+    private final int proxyPort;
 
     public NbuSiteParser(Properties properties) {
         this.mainUrl = properties.getProperty("MainURL");
         this.downloadUrl = properties.getProperty("DownloadURL");
         this.workPath = properties.getProperty("WorkPath");
-        this.logLevel = properties.getProperty("LogLevel");
+        this.proxy = properties.getProperty("Proxy");
+        this.proxyPort = Integer.parseInt(Optional.ofNullable(properties.getProperty("ProxyPort")).orElse("0"));
+        String logLevel = properties.getProperty("LogLevel");
 
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
         root.setLevel(Level.valueOf(logLevel));
@@ -41,10 +46,13 @@ public class NbuSiteParser {
         logger.info("Start parsing: {} ...", downloadUrl);
         Document doc;
         try {
-            doc = Jsoup.connect(downloadUrl)
+            Connection connection = Jsoup.connect(downloadUrl)
                     .userAgent("Chrome/4.0.249.0 Safari/532.5")
-                    .referrer("http://www.google.com")
-                    .get();
+                    .referrer("http://www.google.com");
+            if (this.proxy != null && !this.proxy.isEmpty()) {
+                connection.proxy(this.proxy, this.proxyPort);
+            }
+            doc = connection.get();
         } catch (IOException e) {
             logger.error("err_load_doc", e);
             throw e;
@@ -66,7 +74,7 @@ public class NbuSiteParser {
 
             Element td0 = tds.get(0);
             String td0Text = td0.text();
-            logger.debug("\ttd0:{}",td0Text);
+            logger.debug("\ttd0:{}", td0Text);
             if (!isCode(td0Text) && !isDate(td0Text)) {
                 reportCategory = td0Text;
                 firstRowInCategory = true;
@@ -85,7 +93,7 @@ public class NbuSiteParser {
             while (tdNum <= dataTds.size()) {
                 Element td = dataTds.get(tdNum - 1);
                 String tdText = td.text();
-                logger.debug("\ttd:{}:{}",tdNum,tdText);
+                logger.debug("\ttd:{}:{}", tdNum, tdText);
                 if (isCode(tdText)) {
                     code = tdText;
                 } else if (isRepName(tdText)) {
@@ -126,10 +134,10 @@ public class NbuSiteParser {
         for (ReportInfo reportInfo : reportInfos) {
             updateReportInfo(reportInfo);
             if (reportInfo.isChanged()) {
-                logger.info("changes:{}",reportInfo.getChanges());
+                logger.info("changes:{}", reportInfo.getChanges());
             }
         }
-        logger.info("End parsing: {}",downloadUrl);
+        logger.info("End parsing: {}", downloadUrl);
     }
 
     private void updateReportInfo(ReportInfo reportInfo) {
@@ -183,10 +191,19 @@ public class NbuSiteParser {
     }
 
     private void downloadUsingNIO(String urlStr, String file) {
+        logger.debug("downloading: {} to {}", urlStr, file);
         URL url;
         try {
             url = new URL(urlStr);
-            ReadableByteChannel rbc = Channels.newChannel(url.openStream());
+
+            URLConnection urlConnection;
+            if (this.proxy != null && !this.proxy.isEmpty()) {
+                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(this.proxy, this.proxyPort));
+                urlConnection = url.openConnection(proxy);
+            } else {
+                urlConnection = url.openConnection();
+            }
+            ReadableByteChannel rbc = Channels.newChannel(urlConnection.getInputStream());
 
             File fileDir = new File(file).getParentFile();
             fileDir.mkdirs();
