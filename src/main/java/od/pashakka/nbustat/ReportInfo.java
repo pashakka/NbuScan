@@ -134,24 +134,47 @@ public class ReportInfo {
     }
 
     public String getURL(FileType fileType) {
-        return switch (fileType) {
-            case REGISTRY -> getRegistryURL();
-            case DESCRIPTION -> getDescriptionURL();
-            case DOMAIN_LIST -> getDomainListURL();
-            case CONTROLS -> getControlsURL();
-            case SCHEMA -> getSchemaURL();
-        };
+        String url;
+        switch (fileType) {
+            case REGISTRY:
+                url = getRegistryURL();
+                break;
+            case DESCRIPTION:
+                url = getDescriptionURL();
+                break;
+            case DOMAIN_LIST:
+                url = getDomainListURL();
+                break;
+            case CONTROLS:
+                url = getControlsURL();
+                break;
+            case SCHEMA:
+                url = getSchemaURL();
+                break;
+            default:
+                url = null;
+        }
+        return url;
     }
 
     public String getDate(FileType fileType) {
-        String date = switch (fileType) {
-            case REGISTRY -> getRegistryDate();
-            case DESCRIPTION -> getDescriptionDate();
-            case DOMAIN_LIST -> getDomainListDate();
-            case CONTROLS -> getControlsDate();
-            default -> null;
-        };
-
+        String date;
+        switch (fileType) {
+            case REGISTRY:
+                date = getRegistryDate();
+                break;
+            case DESCRIPTION:
+                date = getDescriptionDate();
+                break;
+            case DOMAIN_LIST:
+                date = getDomainListDate();
+                break;
+            case CONTROLS:
+                date = getControlsDate();
+                break;
+            default:
+                date = null;
+        }
         return reformatDate(date);
     }
 
