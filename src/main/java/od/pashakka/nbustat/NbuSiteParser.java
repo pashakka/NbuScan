@@ -12,7 +12,10 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
@@ -95,7 +98,7 @@ public class NbuSiteParser {
                 String tdText = td.text();
                 logger.debug("\ttd:{}:{}", tdNum, tdText);
                 if (isCode(tdText)) {
-                    code = tdText;
+                    code = tdText.replaceAll("\\*", "");
                 } else if (isRepName(tdText)) {
                     name = tdText;
                 } else if (isDate(tdText)) {
@@ -194,6 +197,9 @@ public class NbuSiteParser {
         logger.debug("downloading: {} to {}", urlStr, file);
         URL url;
         try {
+            if (file.toUpperCase().contains("XSD")) {
+                file = getXsdFileName(file);
+            }
             url = new URL(urlStr);
 
             URLConnection urlConnection;
@@ -216,6 +222,17 @@ public class NbuSiteParser {
             logger.error("err_download_file", e);
             throw new IllegalStateException("err_download_file", e);
         }
+    }
+
+    private String getXsdFileName(String file) {
+        String xsdFileName = file;
+        int i = file.indexOf("?reportdate=");
+        if (i > 0) {
+            String cleanFile = file.substring(0, i);
+            String reportDate = file.substring(file.length() - 8);
+            xsdFileName = cleanFile + "_" + reportDate;
+        }
+        return xsdFileName;
     }
 
     private String extractURL(Element td) {
